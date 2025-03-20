@@ -1,0 +1,88 @@
+# stage file using a substring of the file name
+# eg:
+# $ git status -s
+#  M  redline/apps/redline_web_store/something.js
+#  M  redline/apps/redline_web_store/something.eex
+# $ gti-add .js
+# M   redline/apps/redline_web_store/something.js
+#  M  redline/apps/redline_web_store/something.eex
+function git-add () {
+    git add $(git status -s | awk -F ' ' '{print $2}' | grep $1) && git status -s
+}
+
+# unstage changes to a file using a substring of the file name
+# eg:
+# $ git-unstage .js
+function git-unstage () {
+    git reset HEAD -- $(git status -s | awk -F ' ' '{print $2}' | grep $1)
+}
+
+# discard changes to a file using a substring of the file name
+# eg:
+# $ git-discard .js
+function git-discard () {
+    git checkout -- $(git status -s | awk -F ' ' '{print $2}' | grep $1) && git status -s
+}
+
+# commit changes with auto-prepended JIRA ticket number
+# eg:
+# $ git branch
+#   JIRA-123-things
+# * JIRA-321-stuff
+# $ git-commit "my descriptive commit message"
+# [JIRA-321 0099cc9ad4] JIRA-321 my descriptive commit message
+#  3 files changed, 4 insertions(+), 7 deletions(-)
+function git-commit () {
+    git commit -m "$(git rev-parse --abbrev-ref HEAD | sed 's/^[^A-Z]*\([A-Z]\{2,\}-[0-9]\+\).*$/\1/') $1"
+}
+
+# diff file using a substring of the file name
+# eg:
+# $ git-diff .js
+function git-diff () {
+    git diff $(git status -s | awk -F ' ' '{print $2}' | grep $1)
+}
+
+# checkout a branch using a substring of the branch name
+# eg:
+# $ git-checkout JIRA-123
+function git-checkout () {
+    git checkout $(git branch | awk -F ' ' '{print $1}' | grep $1) && git branch
+}
+
+# shortcut for setting upstream
+function git-push () {
+    git push --set-upstream ${1:-origin} $(git rev-parse --abbrev-ref HEAD | awk -F ' ' '{print $1}')
+}
+
+function git-status () {
+    git status -s
+}
+
+function git-branch-cleanup () {
+    git stash && \
+    git checkout ${1:-master} && \
+    git branch --merged | egrep -v "(^\*|master|main|dev|keep)" | xargs git branch -d
+}
+
+function git-branch () {
+    git add . && \
+    git stash && \
+    git checkout master && \
+    git fetch upstream && \
+    git pull upstream master && \
+    git checkout -b $1
+}
+
+function git-squash-push () {
+    git reset --soft HEAD~2 &&
+    git commit &&
+    git push --force
+}
+
+function git-commit-squash () {
+    git commit -m "whatever, imma squash it" &&
+    git reset --soft HEAD~2 &&
+    git commit &&
+    git push --force
+}
