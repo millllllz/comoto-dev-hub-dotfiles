@@ -24,13 +24,13 @@ source $COMOTO_DEVTOOLS/devtools.sh
 # If you are doing local development for any of these services then update your .bashrc or equivalent to source
 # the bash_functions.sh provided in that service's repo. It must be sourced after this file is sourced to ensure the
 # functions provided are correctly overridden to the repo's versions.
-source $ZV_SCRIPTS/loyalty_api.sh
-source $ZV_SCRIPTS/message_failure_service.sh
-source $ZV_SCRIPTS/product_search_service.sh
-source $ZV_SCRIPTS/product_service.sh
-source $ZV_SCRIPTS/payment_service.sh
-source $ZV_SCRIPTS/admin.sh
-source $ZV_SCRIPTS/jobs.sh
+# source $ZV_SCRIPTS/loyalty_api.sh
+# source $ZV_SCRIPTS/message_failure_service.sh
+# source $ZV_SCRIPTS/product_search_service.sh
+# source $ZV_SCRIPTS/product_service.sh
+# source $ZV_SCRIPTS/payment_service.sh
+# source $ZV_SCRIPTS/admin.sh
+# source $ZV_SCRIPTS/jobs.sh
 
 #
 # GENERIC
@@ -157,7 +157,7 @@ function postgres-dump-restore() {
 
 function postgres-psql() {
   cd $COMPOSE_ROOT;
-  docker exec -ti -e PGPASSWORD='PG92d3vp@assw0rd' -u postgres $(docker compose ps postgres14 --format '{{.Name}}') psql -h localhost ecom;
+  docker exec -ti -e PGPASSWORD='PG92d3vp@assw0rd' -u postgres $(docker compose ps postgres14 --format '{{.Name}}') postgres -h localhost ecom;
   cd -;
 }
 
@@ -574,3 +574,111 @@ function check_product_search_service_index() {
     fi
   fi
 }
+
+# Docker compose up with optional container logging
+# Usage: dup [service_name_pattern]
+# Example: dup, dup rz, dup cg, dup jp
+# Default: rz (revzilla-redline-webapp if no argument provided)
+# Shortcuts: rz=revzilla-redline-webapp, cg=cycle-gear-redline-webapp, jp=jp-cycles-redline-webapp
+function dup() {
+  local pattern="${1:-rz}"
+  local service=""
+  local is_shortcut=false
+
+  # Apply shortcuts - these are exact service names, no further searching needed
+  case "$pattern" in
+    rz)
+      service="revzilla-redline-webapp"
+      is_shortcut=true
+      ;;
+    cg)
+      service="cycle-gear-redline-webapp"
+      is_shortcut=true
+      ;;
+    jp)
+      service="jp-cycles-redline-webapp"
+      is_shortcut=true
+      ;;
+  esac
+
+  # If not a shortcut, search for the pattern
+  if [ "$is_shortcut" = false ]; then
+    # First try with -redline-webapp suffix
+    service=$(cd $COMPOSE_ROOT && docker compose ps --format '{{.Service}}' | grep "${pattern}-redline-webapp" | head -n 1)
+
+    # If no redline-webapp match, try general pattern
+    if [ -z "$service" ]; then
+      service=$(cd $COMPOSE_ROOT && docker compose ps --format '{{.Service}}' | grep "$pattern" | head -n 1)
+    fi
+  fi
+
+  (cd $COMPOSE_ROOT && docker compose up -d)
+
+  if [ -n "$service" ]; then
+    echo "Following logs for: $service"
+    (cd $COMPOSE_ROOT && docker compose logs --tail=10 -f "$service")
+  else
+    echo "No running service found matching pattern: $pattern"
+    echo "Available services:"
+    (cd $COMPOSE_ROOT && docker compose ps --format '{{.Service}}')
+  fi
+}
+
+# Docker compose restart with optional container logging
+# Usage: drestart [service_name_pattern]
+# Example: drestart (restarts all), drestart rz, drestart cg, drestart jp
+# Default: restarts all containers if no argument provided
+# Shortcuts: rz=revzilla-redline-webapp, cg=cycle-gear-redline-webapp, jp=jp-cycles-redline-webapp
+function drestart() {
+  local pattern="$1"
+  local service=""
+  local is_shortcut=false
+
+  # If no argument provided, restart all containers
+  if [ -z "$pattern" ]; then
+    echo "Restarting all containers..."
+    (cd $COMPOSE_ROOT && docker compose restart)
+    return 0
+  fi
+
+  # Apply shortcuts - these are exact service names, no further searching needed
+  case "$pattern" in
+    rz)
+      service="revzilla-redline-webapp"
+      is_shortcut=true
+      ;;
+    cg)
+      service="cycle-gear-redline-webapp"
+      is_shortcut=true
+      ;;
+    jp)
+      service="jp-cycles-redline-webapp"
+      is_shortcut=true
+      ;;
+  esac
+
+  # If not a shortcut, search for the pattern
+  if [ "$is_shortcut" = false ]; then
+    # First try with -redline-webapp suffix
+    service=$(cd $COMPOSE_ROOT && docker compose ps --format '{{.Service}}' | grep "${pattern}-redline-webapp" | head -n 1)
+
+    # If no redline-webapp match, try general pattern
+    if [ -z "$service" ]; then
+      service=$(cd $COMPOSE_ROOT && docker compose ps --format '{{.Service}}' | grep "$pattern" | head -n 1)
+    fi
+  fi
+
+  if [ -n "$service" ]; then
+    echo "Restarting: $service"
+    (cd $COMPOSE_ROOT && docker compose restart "$service")
+    echo "Following logs for: $service"
+    (cd $COMPOSE_ROOT && docker compose logs --tail=10 -f "$service")
+  else
+    echo "No running service found matching pattern: $pattern"
+    echo "Available services:"
+    (cd $COMPOSE_ROOT && docker compose ps --format '{{.Service}}')
+  fi
+}
+
+
+
