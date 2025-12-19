@@ -74,15 +74,38 @@ function git-branch () {
     git checkout -b $1
 }
 
-function git-squash-push () {
-    git reset --soft HEAD~2 &&
-    git commit &&
-    git push --force
+
+# reset a changed file to its master version using a substring of the file name
+# eg:
+# $ git diff --name-only master
+#   redline/apps/redline_web_store/something.js
+#   redline/apps/redline_web_store/something.eex
+# $ git-reset-from-master .js
+# (resets something.js to the version from master)
+function git-reset-from-master () {
+    local files=$(git diff --name-only master | grep $1)
+    if [ -z "$files" ]; then
+        echo "No files matching '$1' found"
+        return 1
+    fi
+    git checkout master -- $files && git status -s
 }
 
-function git-commit-squash () {
-    git commit -m "whatever, imma squash it" &&
-    git reset --soft HEAD~2 &&
-    git commit &&
-    git push --force
+# commit staged changes and squash into previous commit, keeping the previous commit message
+
+# commit staged changes and squash into previous commit, keeping the previous commit message
+# eg:
+# $ git-squash-commit
+# (commits staged changes and squashes into previous commit)
+function git-squash-commit () {
+    # Check if there are unstaged changes
+    if ! git diff-files --quiet; then
+        git stash push --keep-index -m "git-squash-commit temporary stash" && \
+        git commit --fixup=HEAD && \
+        GIT_SEQUENCE_EDITOR=true git rebase --interactive --autosquash HEAD~2 && \
+        git stash pop
+    else
+        git commit --fixup=HEAD && \
+        GIT_SEQUENCE_EDITOR=true git rebase --interactive --autosquash HEAD~2
+    fi
 }
