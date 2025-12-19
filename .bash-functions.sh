@@ -682,3 +682,73 @@ function drestart() {
 
 
 
+
+# Docker compose logs with optional grep filtering and support for multiple containers
+# Usage: dlog [service_name_pattern] [grep_pattern]
+# Example: dlog, dlog rz, dlog cg "error", dlog postgres
+# Default: rz (revzilla-redline-webapp if no argument provided)
+# Shortcuts: rz=revzilla-redline-webapp, cg=cycle-gear-redline-webapp, jp=jp-cycles-redline-webapp
+# Note: Can follow logs from multiple matching containers simultaneously
+function dlog() {
+  local pattern="${1:-rz}"
+  local grep_pattern="$2"
+  local services=()
+  local is_shortcut=false
+
+  # Apply shortcuts - these are exact service names, no further searching needed
+  case "$pattern" in
+    rz)
+      services=("revzilla-redline-webapp")
+      is_shortcut=true
+      ;;
+    cg)
+      services=("cycle-gear-redline-webapp")
+      is_shortcut=true
+      ;;
+    jp)
+      services=("jp-cycles-redline-webapp")
+      is_shortcut=true
+      ;;
+  esac
+
+  # If not a shortcut, search for the pattern and collect ALL matches
+  if [ "$is_shortcut" = false ]; then
+    # First try with -redline-webapp suffix
+    local webapp_matches=$(cd $COMPOSE_ROOT && docker compose ps --format '{{.Service}}' | grep "${pattern}-redline-webapp")
+    
+    if [ -n "$webapp_matches" ]; then
+      # Convert newline-separated matches to array
+      while IFS= read -r line; do
+        services+=("$line")
+      done <<< "$webapp_matches"
+    else
+      # If no redline-webapp match, try general pattern
+      local general_matches=$(cd $COMPOSE_ROOT && docker compose ps --format '{{.Service}}' | grep "$pattern")
+      
+      if [ -n "$general_matches" ]; then
+        while IFS= read -r line; do
+          services+=("$line")
+        done <<< "$general_matches"
+      fi
+    fi
+  fi
+
+  if [ ${#services[@]} -gt 0 ]; then
+    if [ ${#services[@]} -eq 1 ]; then
+      echo "Following logs for: ${services[0]}"
+    else
+      echo "Following logs for ${#services[@]} services: ${services[*]}"
+    fi
+    
+    if [ -n "$grep_pattern" ]; then
+      echo "Filtering for: $grep_pattern"
+      (cd $COMPOSE_ROOT && docker compose logs --tail=10 -f "${services[@]}" | grep --color=auto "$grep_pattern")
+    else
+      (cd $COMPOSE_ROOT && docker compose logs --tail=10 -f "${services[@]}")
+    fi
+  else
+    echo "No running service found matching pattern: $pattern"
+    echo "Available services:"
+    (cd $COMPOSE_ROOT && docker compose ps --format '{{.Service}}')
+  fi
+}
