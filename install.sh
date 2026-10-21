@@ -9,6 +9,11 @@ for f in .millz.sh .bash-functions.sh .git-helpers; do
   ln -sfn "$DOTFILES_DIR/$f" "$HOME/$f"
 done
 
+# Run On Save formatter; chmod here because a file added through the GitHub web editor is not executable.
+chmod +x "$DOTFILES_DIR/bin/format-on-save"
+mkdir -p "$HOME/.local/bin"
+ln -sfn "$DOTFILES_DIR/bin/format-on-save" "$HOME/.local/bin/format-on-save"
+
 SOURCE_LINE='[ -f "$HOME/.millz.sh" ] && source "$HOME/.millz.sh"'
 
 for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
