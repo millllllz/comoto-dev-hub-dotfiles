@@ -1,0 +1,14 @@
+#!/bin/sh
+# Run On Save hook: mix format the saved file from its outermost Mix project (the umbrella root in an umbrella),
+# in a build root of its own so it never touches the _build shared with a containerized dev server.
+file="$1"
+root=$(git -C "$(dirname "$file")" rev-parse --show-toplevel 2>/dev/null) || exit 0
+dir=$(dirname "$file")
+project=""
+while :; do
+  [ -f "$dir/mix.exs" ] && project="$dir"
+  if [ "$dir" = "$root" ] || [ "$dir" = "/" ]; then break; fi
+  dir=$(dirname "$dir")
+done
+[ -n "$project" ] || exit 0
+cd "$project" && MIX_BUILD_ROOT="$project/.elixir_ls/runonsave_build" mix format "$file"
